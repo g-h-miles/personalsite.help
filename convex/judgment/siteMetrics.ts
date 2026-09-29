@@ -93,9 +93,11 @@ function inlineCss(html: string): string {
 }
 
 function visibleText(html: string): string {
+  // Only `<` followed by a letter, `/`, `!` or `?` starts a tag; a literal
+  // "a < b" in text is kept, as in a browser.
   return scanElements(html, ["script", "style", "noscript", "svg", "template"])
     .outside.join(" ")
-    .replace(/<[^>]*(?:>|$)/g, " ")
+    .replace(/<[a-z/!?][^>]*(?:>|$)/gi, " ")
     .replace(/&[a-z#0-9]+;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();

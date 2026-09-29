@@ -199,6 +199,21 @@ describe("extractSiteMetrics on hostile HTML", () => {
     expect(real.colorCount).toBe(1);
   });
 
+  it("keeps text after a literal < that doesn't start a tag", () => {
+    const m = extractSiteMetrics(
+      "<p>Hi, I'm Jane. If 1 < 2 then I have years of experience with clients",
+    );
+    expect(m.backgroundMentions).toBe(3); // years, experience, clients
+  });
+
+  it("stays linear on 1 MB of text full of literal <", () => {
+    const html = "a < b ".repeat(Math.floor(1_000_000 / 6));
+    const start = performance.now();
+    const m = extractSiteMetrics(html);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(m.wordCount).toBe(3 * Math.floor(1_000_000 / 6)); // nothing dropped
+  }, 10_000);
+
   it("still reads tags and links", () => {
     const m = extractSiteMetrics(GOOD_SITE);
     expect(m).toMatchObject({
