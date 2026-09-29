@@ -1,6 +1,7 @@
-import { ROLE_LABELS, type Role } from "@convex/judgment/taxonomy";
+import type { Role } from "@convex/judgment/taxonomy";
 import { Link } from "@tanstack/react-router";
 import type { Id } from "@convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
 
 export interface PersonInfo {
   _id: Id<"users">;
@@ -12,24 +13,49 @@ export interface PersonInfo {
 
 /**
  * A person's name, linking to their own site's page in the community
- * ("your site is your credential"), with their role lenses.
+ * ("your site is your credential"). Anonymous people get no link.
  */
-export function Person({ person }: { person: PersonInfo | null }) {
-  if (!person) return <span className="text-muted-foreground">Anonymous</span>;
+export function PersonName({
+  person,
+  className,
+  linked = true,
+}: {
+  person: PersonInfo | null;
+  className?: string;
+  linked?: boolean;
+}) {
+  const base = cn("font-sans font-bold text-foreground", className);
+  if (!person) return <span className={base}>Anonymous</span>;
+  if (linked && person.siteId) {
+    return (
+      <Link
+        to="/sites/$siteId"
+        params={{ siteId: person.siteId }}
+        className={cn(base, "underline decoration-1 underline-offset-2 hover:text-primary")}
+      >
+        {person.displayName}
+      </Link>
+    );
+  }
+  return <span className={base}>{person.displayName}</span>;
+}
+
+/** Mono metadata next to a name: "designer · asks", "engineer · 2 days ago". */
+export function MonoMeta({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-2">
-      {person.siteId ? (
-        <Link to="/sites/$siteId" params={{ siteId: person.siteId }} className="font-medium">
-          {person.displayName}
-        </Link>
-      ) : (
-        <span className="font-medium">{person.displayName}</span>
-      )}
-      {person.roles.length > 0 && (
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">
-          {person.roles.map((r) => ROLE_LABELS[r]).join(" · ")}
-        </span>
-      )}
+    <span className={cn("font-mono text-[13px] leading-[18px] text-ink-secondary", className)}>
+      {children}
     </span>
   );
+}
+
+/** @deprecated Kept until the profile and notes move to PersonName. */
+export function Person({ person }: { person: PersonInfo | null }) {
+  return <PersonName person={person} />;
 }
