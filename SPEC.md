@@ -18,7 +18,8 @@ site do its job for me?" and get a straight answer.
 3. **Trending** — Sites ranked by attention/clicks, so good work surfaces.
 4. **Graduate** — Mark your site live/complete and it moves into a
    discovery/archive section, preserving all past advice as its history.
-5. **Hall of fame** — Curated standout finished sites.
+5. **Hall of fame** — Standout finished sites, hand-picked by the maintainer.
+   No votes, no score threshold. Inductees verify their domain.
 
 Two core value props: **actionable feedback** on whether your site sells you,
 and **ideas** from browsing other people's.
@@ -194,5 +195,4 @@ The audience (designers/devs) is exactly the audience that contributes.
 - Judgment provider: Jev vs OpenAI Decisions API (access, price, latency, calibration).
 - Reciprocity: is "2 critiques to post" the right gate, or too strict for launch?
 - Trending algorithm: pure clicks, or time-decayed with critique velocity?
-- Hall of fame curation: community vote, maintainer pick, or score threshold?
 - Badge design for the "in review" embed.
