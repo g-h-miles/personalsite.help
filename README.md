@@ -111,10 +111,14 @@ reciprocity gate, live in `convex/lib/config.ts`.
 Hosting is Cloudflare static assets with SPA fallback (`wrangler.jsonc`).
 
 ```sh
-npx convex deploy                  # production Convex deployment (set its env vars too)
-VITE_CONVEX_URL=<prod url> VITE_CLERK_PUBLISHABLE_KEY=<prod key> pnpm build
+# Deploys Convex functions to production, then builds the site against the
+# production Convex URL. VITE_CLERK_PUBLISHABLE_KEY is read from .env.local.
+npx convex deploy --cmd 'pnpm build'
 npx wrangler deploy                # needs a Cloudflare login
 ```
+
+Production Convex needs `CLERK_JWT_ISSUER_DOMAIN` set
+(`npx convex env set --prod CLERK_JWT_ISSUER_DOMAIN <issuer url>`).
 
 ## License
 
