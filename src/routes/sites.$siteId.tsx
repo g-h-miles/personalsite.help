@@ -108,7 +108,7 @@ function SiteProfilePage() {
             <a
               href={site.url}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               onClick={() => void recordClick({ siteId: site._id, visitorId: visitorId() })}
               className="text-base leading-6 font-bold text-foreground"
             >
