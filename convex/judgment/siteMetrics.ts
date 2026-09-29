@@ -47,10 +47,12 @@ function count(html: string, re: RegExp): number {
  * them, and the contents of each closed one. Linear time even on hostile input,
  * unlike a lazy `<tag>[\s\S]*?</tag>` regex, which rescans the rest of the
  * document for every unclosed tag. An unclosed element swallows the rest of the
- * document (it is dropped from `outside` and not returned in `inside`).
+ * document (it is dropped from `outside` and not returned in `inside`). The tag
+ * name must end in whitespace, `/` or `>`, so custom elements like
+ * <script-foo> don't count as <script>.
  */
 function scanElements(html: string, tags: readonly string[]) {
-  const open = new RegExp(`<(${tags.join("|")})\\b`, "gi");
+  const open = new RegExp(`<(${tags.join("|")})(?=[\\s/>])`, "gi");
   const outside: string[] = [];
   const inside: string[] = [];
   let pos = 0;

@@ -185,6 +185,20 @@ describe("extractSiteMetrics on hostile HTML", () => {
     expect(m.colorCount).toBe(1);
   });
 
+  it("doesn't treat custom elements like <script-foo> as script or style", () => {
+    const m = extractSiteMetrics(
+      `<script-foo>visible words</script-foo><style-x>color: #123</style-x><p>after</p>`,
+    );
+    expect(m.wordCount).toBe(5); // "visible words color: #123 after"
+    expect(m.colorCount).toBe(0);
+    // Real script and style elements still end at whitespace, "/" or ">".
+    const real = extractSiteMetrics(
+      `<script type="module">hidden()</script><style\n>p { color: #abc }</style><p>shown</p>`,
+    );
+    expect(real.wordCount).toBe(1);
+    expect(real.colorCount).toBe(1);
+  });
+
   it("still reads tags and links", () => {
     const m = extractSiteMetrics(GOOD_SITE);
     expect(m).toMatchObject({
