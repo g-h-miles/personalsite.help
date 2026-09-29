@@ -4,7 +4,9 @@
  * The scorecard judges these extracted signals (per the spec: DOM/content/style
  * metrics, not raw screenshots). This is intentionally a rough first pass using
  * regular expressions — it only needs to be good enough to give a judgment
- * model useful evidence. A vision-model or headless-browser extractor can
+ * model useful evidence. The HTML comes from arbitrary sites, so every pass
+ * must stay linear: no pattern that rescans the rest of the document from each
+ * unclosed tag or quote (see scanElements and tagsOf). A vision-model or headless-browser extractor can
  * replace it later without changing the scorecard.
  */
 
@@ -40,24 +42,65 @@ function count(html: string, re: RegExp): number {
   return html.match(re)?.length ?? 0;
 }
 
+/**
+ * Split `html` around the given elements in one forward pass: the text outside
+ * them, and the contents of each closed one. Linear time even on hostile input,
+ * unlike a lazy `<tag>[\s\S]*?</tag>` regex, which rescans the rest of the
+ * document for every unclosed tag. An unclosed element swallows the rest of the
+ * document (it is dropped from `outside` and not returned in `inside`).
+ */
+function scanElements(html: string, tags: readonly string[]) {
+  const open = new RegExp(`<(${tags.join("|")})\\b`, "gi");
+  const outside: string[] = [];
+  const inside: string[] = [];
+  let pos = 0;
+  for (;;) {
+    open.lastIndex = pos;
+    const start = open.exec(html);
+    if (!start) break;
+    outside.push(html.slice(pos, start.index));
+    const bodyStart = html.indexOf(">", open.lastIndex) + 1;
+    if (bodyStart === 0) return { outside, inside };
+    const close = new RegExp(`</${start[1]}\\s*>`, "gi");
+    close.lastIndex = bodyStart;
+    const end = close.exec(html);
+    if (!end) return { outside, inside };
+    inside.push(html.slice(bodyStart, end.index));
+    pos = close.lastIndex;
+  }
+  outside.push(html.slice(pos));
+  return { outside, inside };
+}
+
+/**
+ * Every start tag and its name, in one linear pass. An unclosed tag runs to the
+ * end of the document, as it does in a browser. Attribute checks then run on
+ * one tag at a time instead of on the whole document.
+ */
+function tagsOf(html: string): { name: string; tag: string }[] {
+  return (html.match(/<[a-z][^>]*(?:>|$)/gi) ?? []).map((tag) => ({
+    name: /^<([a-z][a-z0-9-]*)/i.exec(tag)?.[1]?.toLowerCase() ?? "",
+    tag,
+  }));
+}
+
 function inlineCss(html: string): string {
-  const blocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1] ?? "");
-  const attrs = [...html.matchAll(/\sstyle\s*=\s*"([^"]*)"/gi)].map((m) => m[1] ?? "");
+  const blocks = scanElements(html, ["style"]).inside;
+  const attrs = [...html.matchAll(/\sstyle\s*=\s*"([^"]*)/gi)].map((m) => m[1] ?? "");
   return [...blocks, ...attrs].join("\n");
 }
 
 function visibleText(html: string): string {
-  return html
-    .replace(/<(script|style|noscript|svg|template)[^>]*>[\s\S]*?<\/\1>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+  return scanElements(html, ["script", "style", "noscript", "svg", "template"])
+    .outside.join(" ")
+    .replace(/<[^>]*(?:>|$)/g, " ")
     .replace(/&[a-z#0-9]+;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 export function extractSiteMetrics(html: string): SiteMetrics {
-  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch?.[1]?.replace(/\s+/g, " ").trim() || null;
+  const title = scanElements(html, ["title"]).inside[0]?.replace(/\s+/g, " ").trim() || null;
 
   const headingLevels = [...html.matchAll(/<h([1-6])[\s>]/gi)].map((m) => Number(m[1]));
   let headingLevelsSkipped = false;
@@ -67,8 +110,12 @@ export function extractSiteMetrics(html: string): SiteMetrics {
     if (cur > prev + 1) headingLevelsSkipped = true;
   }
 
-  const imgTags = html.match(/<img\b[^>]*>/gi) ?? [];
-  const imagesWithAlt = imgTags.filter((tag) => /\salt\s*=\s*"[^"]+"/i.test(tag)).length;
+  const tags = tagsOf(html);
+  const named = (name: string) => tags.filter((t) => t.name === name).map((t) => t.tag);
+  const metas = named("meta");
+  const imgTags = named("img");
+  const imagesWithAlt = imgTags.filter((tag) => /\salt\s*=\s*"[^"]/i.test(tag)).length;
+  const hrefs = [...html.matchAll(/href\s*=\s*["']([^"']*)/gi)].map((m) => m[1] ?? "");
 
   const css = inlineCss(html);
   const fontFamilies = new Set(
@@ -77,8 +124,8 @@ export function extractSiteMetrics(html: string): SiteMetrics {
     ),
   );
   const colors = new Set(
-    (css.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|oklch\([^)]*\)/gi) ?? []).map((c) =>
-      c.toLowerCase().replace(/\s+/g, ""),
+    (css.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)?|hsla?\([^)]*\)?|oklch\([^)]*\)?/gi) ?? []).map(
+      (c) => c.toLowerCase().replace(/\s+/g, ""),
     ),
   );
 
@@ -87,29 +134,35 @@ export function extractSiteMetrics(html: string): SiteMetrics {
 
   return {
     title,
-    hasMetaDescription: /<meta[^>]+name\s*=\s*["']description["'][^>]*>/i.test(html),
-    hasViewportMeta: /<meta[^>]+name\s*=\s*["']viewport["'][^>]*>/i.test(html),
-    hasLang: /<html[^>]+\slang\s*=\s*["'][^"']+["']/i.test(html),
+    hasMetaDescription: metas.some((tag) => /\sname\s*=\s*["']description["']/i.test(tag)),
+    hasViewportMeta: metas.some((tag) => /\sname\s*=\s*["']viewport["']/i.test(tag)),
+    hasLang: named("html").some((tag) => /\slang\s*=\s*["']?[a-z]/i.test(tag)),
     h1Count: headingLevels.filter((l) => l === 1).length,
     headingCount: headingLevels.length,
     headingLevelsSkipped,
     imageCount: imgTags.length,
     imagesWithAlt,
-    inputCount: count(html, /<(input|textarea|select)\b(?![^>]*type\s*=\s*["']hidden["'])/gi),
+    inputCount: tags.filter(
+      (t) =>
+        (t.name === "input" || t.name === "textarea" || t.name === "select") &&
+        !/type\s*=\s*["']hidden["']/i.test(t.tag),
+    ).length,
     labelCount: count(html, /<label\b/gi),
-    linkCount: count(html, /<a\b[^>]*href/gi),
+    linkCount: named("a").filter((tag) => /href/i.test(tag)).length,
     wordCount: text ? text.split(" ").length : 0,
     fontFamilyCount: fontFamilies.size,
     colorCount: colors.size,
-    externalStylesheetCount: count(html, /<link[^>]+rel\s*=\s*["']stylesheet["']/gi),
+    externalStylesheetCount: named("link").filter((tag) =>
+      /rel\s*=\s*["']stylesheet["']/i.test(tag),
+    ).length,
     hasFirstPersonIntro: /\b(i'm|i am|hi,? i|hello,? i|my name is)\b/i.test(opening),
     backgroundMentions: count(
       text,
       /\b(experience|worked|working at|previously|resume|résumé|cv|clients|founded|studied|years)\b/gi,
     ),
-    hasContactLink:
-      /href\s*=\s*["'](mailto:|[^"']*\/contact|[^"']*(linkedin\.com|cal\.com|calendly\.com))/i.test(
-        html,
-      ),
+    hasContactLink: hrefs.some(
+      (href) =>
+        /^mailto:/i.test(href) || /\/contact|linkedin\.com|cal\.com|calendly\.com/i.test(href),
+    ),
   };
 }
