@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
-import { RECIPROCITY_CRITIQUES_REQUIRED } from "../convex/lib/config";
+import { CLICK_DEDUPE_WINDOW_MS, RECIPROCITY_CRITIQUES_REQUIRED } from "../convex/lib/config";
 import { SCORECARD_ERRORS } from "../convex/sites";
 import schema from "../convex/schema";
 
@@ -180,6 +180,56 @@ describe("scorecard failures", () => {
     );
     const profile = await t.query(api.sites.get, { siteId });
     expect(profile?.site.scorecardError).toBe(SCORECARD_ERRORS.failed);
+  });
+});
+
+async function clicks(t: ReturnType<typeof convexTest>, siteId: Id<"sites">) {
+  return (await t.query(api.sites.get, { siteId }))?.site.clickCount;
+}
+
+describe("sites.recordClick", () => {
+  it("counts one click per anonymous visitor per window", async () => {
+    const { t } = setup();
+    const siteId = await seedSite(t, "ivy", "https://ivy.dev");
+    const visitorId = "0f8c2a4e-7b1d-4c3e-9a6f-2d5b8e1c7a90";
+
+    await t.mutation(api.sites.recordClick, { siteId, visitorId });
+    await t.mutation(api.sites.recordClick, { siteId, visitorId });
+    expect(await clicks(t, siteId)).toBe(1);
+
+    await t.mutation(api.sites.recordClick, { siteId, visitorId: "another-visitor-id" });
+    expect(await clicks(t, siteId)).toBe(2);
+
+    vi.advanceTimersByTime(CLICK_DEDUPE_WINDOW_MS - 1000);
+    await t.mutation(api.sites.recordClick, { siteId, visitorId });
+    expect(await clicks(t, siteId)).toBe(2);
+
+    vi.advanceTimersByTime(1000);
+    await t.mutation(api.sites.recordClick, { siteId, visitorId });
+    expect(await clicks(t, siteId)).toBe(3);
+  });
+
+  it("doesn't count clicks with no visitor, or with a malformed id", async () => {
+    const { t } = setup();
+    const siteId = await seedSite(t, "jo", "https://jo.dev");
+    await t.mutation(api.sites.recordClick, { siteId });
+    await t.mutation(api.sites.recordClick, { siteId, visitorId: "x" });
+    await t.mutation(api.sites.recordClick, { siteId, visitorId: "a".repeat(65) });
+    await t.mutation(api.sites.recordClick, { siteId, visitorId: "has spaces in it" });
+    expect(await clicks(t, siteId)).toBe(0);
+  });
+
+  it("dedupes signed-in visitors by user, whatever anonymous id they send", async () => {
+    const { t, bob } = setup();
+    const siteId = await seedSite(t, "kim", "https://kim.dev");
+    await t.run((ctx) =>
+      ctx.db.insert("users", { clerkId: "user_bob", displayName: "Bob", roles: [] }),
+    );
+
+    await bob.mutation(api.sites.recordClick, { siteId, visitorId: "first-anon-id" });
+    await bob.mutation(api.sites.recordClick, { siteId, visitorId: "second-anon-id" });
+    await bob.mutation(api.sites.recordClick, { siteId });
+    expect(await clicks(t, siteId)).toBe(1);
   });
 });
 

@@ -9,7 +9,12 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { getViewer, requireViewer } from "./lib/auth";
-import { AUDIENCE_MAX, CONTEXT_MAX, RECIPROCITY_CRITIQUES_REQUIRED } from "./lib/config";
+import {
+  AUDIENCE_MAX,
+  CLICK_DEDUPE_WINDOW_MS,
+  CONTEXT_MAX,
+  RECIPROCITY_CRITIQUES_REQUIRED,
+} from "./lib/config";
 import { bumpClickHeat } from "./lib/trending";
 import { normalizeSiteUrl } from "./lib/url";
 import { helpWanted, judgmentProviderName, scorecardDimension } from "./schema";
@@ -84,6 +89,9 @@ function publicScorecardError(stored: string | undefined): string | undefined {
   if (!stored) return undefined;
   return Object.values(SCORECARD_ERRORS).find((m) => m === stored) ?? SCORECARD_ERRORS.failed;
 }
+
+/** Anonymous visitor ids are client-generated; accept only short opaque tokens. */
+const VISITOR_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -335,15 +343,34 @@ export const graduate = mutation({
 });
 
 /**
- * Record an outbound click. Anonymous by design.
- * TODO: de-duplicate per visitor / rate limit to resist click inflation.
+ * Record an outbound click. Counted at most once per visitor per site every
+ * `CLICK_DEDUPE_WINDOW_MS`, so one person can't inflate trending. The visitor
+ * is the signed-in user, else the anonymous id the client keeps in
+ * localStorage; clicks with neither aren't counted.
  */
 export const recordClick = mutation({
-  args: { siteId: v.id("sites") },
-  handler: async (ctx, { siteId }) => {
+  args: { siteId: v.id("sites"), visitorId: v.optional(v.string()) },
+  handler: async (ctx, { siteId, visitorId }) => {
     const site = await ctx.db.get(siteId);
     if (!site) return;
+
+    const viewer = await getViewer(ctx);
+    const visitor = viewer
+      ? `user:${viewer._id}`
+      : visitorId && VISITOR_ID.test(visitorId)
+        ? `anon:${visitorId}`
+        : null;
+    if (!visitor) return;
+
     const now = Date.now();
+    const last = await ctx.db
+      .query("siteClicks")
+      .withIndex("by_site_visitor", (q) => q.eq("siteId", siteId).eq("visitor", visitor))
+      .unique();
+    if (last && now - last.countedAt < CLICK_DEDUPE_WINDOW_MS) return;
+    if (last) await ctx.db.patch(last._id, { countedAt: now });
+    else await ctx.db.insert("siteClicks", { siteId, visitor, countedAt: now });
+
     await ctx.db.patch(siteId, {
       clickCount: site.clickCount + 1,
       clickHeat: bumpClickHeat(site.clickHeat, site.clickHeatAt, now),

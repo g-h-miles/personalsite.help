@@ -26,3 +26,6 @@ export const CONTEXT_MAX = 280;
 
 /** Optional "who is this site meant to convince" on a site submission. */
 export const AUDIENCE_MAX = 120;
+
+/** An outbound click counts at most once per visitor per site in this window. */
+export const CLICK_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;

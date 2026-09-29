@@ -12,6 +12,7 @@ import { Scorecard } from "@/components/scorecard";
 import { Button } from "@/components/ui/button";
 import { askQuestion, asksLine, firstName, quoted } from "@/lib/ask";
 import { daysSince, displayUrl, errorMessage } from "@/lib/format";
+import { visitorId } from "@/lib/visitor";
 
 const siteQuery = (siteId: Id<"sites">) => convexQuery(api.sites.get, { siteId });
 
@@ -108,7 +109,7 @@ function SiteProfilePage() {
               href={site.url}
               target="_blank"
               rel="noopener"
-              onClick={() => void recordClick({ siteId: site._id })}
+              onClick={() => void recordClick({ siteId: site._id, visitorId: visitorId() })}
               className="text-base leading-6 font-bold text-foreground"
             >
               Visit the site ↗<span className="sr-only"> ({domain}, opens in a new tab)</span>

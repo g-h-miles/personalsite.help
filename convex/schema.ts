@@ -120,6 +120,14 @@ export default defineSchema({
     .index("by_owner", ["ownerId"])
     .index("by_normalized_url", ["normalizedUrl"]),
 
+  /** Last counted outbound click per (site, visitor); see sites.recordClick. */
+  siteClicks: defineTable({
+    siteId: v.id("sites"),
+    /** "user:<users id>" when signed in, else "anon:<client-generated id>". */
+    visitor: v.string(),
+    countedAt: v.number(),
+  }).index("by_site_visitor", ["siteId", "visitor"]),
+
   scorecards: defineTable({
     siteId: v.id("sites"),
     provider: judgmentProviderName,
