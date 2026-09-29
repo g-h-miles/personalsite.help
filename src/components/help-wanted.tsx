@@ -120,6 +120,3 @@ export function HelpWantedTiles({
     </div>
   );
 }
-
-/** @deprecated Kept until the submit page moves to HelpWantedTiles. */
-export const HelpWantedPicker = HelpWantedTiles;
