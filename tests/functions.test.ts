@@ -1,9 +1,10 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../convex/_generated/api";
+import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { RECIPROCITY_CRITIQUES_REQUIRED } from "../convex/lib/config";
+import { SCORECARD_ERRORS } from "../convex/sites";
 import schema from "../convex/schema";
 
 const modules = import.meta.glob("../convex/**/*.*s");
@@ -103,6 +104,59 @@ describe("sites.submit", () => {
     expect(profile?.scorecard?.provider).toBe("mock");
     // Requested focus leads the scorecard.
     expect(profile?.scorecard?.dimensions[0]?.weight).toBeGreaterThan(1);
+  });
+});
+
+describe("scorecard failures", () => {
+  it("shows a generic message and logs the raw error", async () => {
+    const { t } = setup();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("connect ECONNREFUSED 10.1.2.3:443");
+      }),
+    );
+    const siteId = await seedSite(t, "frank", "https://frank.dev");
+    await t.action(internal.judge.scoreSite, { siteId });
+
+    const profile = await t.query(api.sites.get, { siteId });
+    expect(profile?.site.scorecardStatus).toBe("failed");
+    expect(profile?.site.scorecardError).toBe(SCORECARD_ERRORS.unreachable);
+    expect(JSON.stringify(profile)).not.toContain("ECONNREFUSED");
+    expect(JSON.stringify(errorLog.mock.calls)).toContain("ECONNREFUSED 10.1.2.3");
+  });
+
+  it("does not follow a redirect into a private address", async () => {
+    const { t } = setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "http://169.254.169.254/latest/meta-data/" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const siteId = await seedSite(t, "gina", "https://gina.dev");
+    await t.action(internal.judge.scoreSite, { siteId });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const profile = await t.query(api.sites.get, { siteId });
+    expect(profile?.site.scorecardError).toBe(SCORECARD_ERRORS.unreachable);
+  });
+
+  it("hides raw errors stored before this change", async () => {
+    const { t } = setup();
+    const siteId = await seedSite(t, "hana", "https://hana.dev");
+    await t.run((ctx) =>
+      ctx.db.patch(siteId, {
+        scorecardStatus: "failed",
+        scorecardError: "SiteFetchFailed: HTTP 403",
+      }),
+    );
+    const profile = await t.query(api.sites.get, { siteId });
+    expect(profile?.site.scorecardError).toBe(SCORECARD_ERRORS.failed);
   });
 });
 

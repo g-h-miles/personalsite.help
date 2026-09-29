@@ -69,6 +69,18 @@ async function countGivenCritiques(ctx: QueryCtx, user: Doc<"users">): Promise<n
   return given.filter((c) => c.moderationStatus !== "held" && c.siteId !== user.siteId).length;
 }
 
+/** User-facing scorecard failure messages. The raw error only goes to the server logs. */
+export const SCORECARD_ERRORS = {
+  unreachable: "We couldn't reach this site to score it.",
+  failed: "Something went wrong while scoring this site.",
+} as const;
+
+/** Never expose a stored error verbatim (older rows hold raw fetch/exception text). */
+function publicScorecardError(stored: string | undefined): string | undefined {
+  if (!stored) return undefined;
+  return Object.values(SCORECARD_ERRORS).find((m) => m === stored) ?? SCORECARD_ERRORS.failed;
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -191,7 +203,7 @@ export const get = query({
         clickCount: site.clickCount,
         critiqueCount: site.critiqueCount,
         scorecardStatus: site.scorecardStatus,
-        scorecardError: site.scorecardError,
+        scorecardError: publicScorecardError(site.scorecardError),
       },
       owner: publicAuthor(owner),
       scorecard,
@@ -398,15 +410,15 @@ export const saveScorecard = internalMutation({
 });
 
 export const markScorecardFailed = internalMutation({
-  args: { siteId: v.id("sites"), error: v.string() },
-  handler: async (ctx, { siteId, error }) => {
+  args: { siteId: v.id("sites"), reason: v.union(v.literal("unreachable"), v.literal("failed")) },
+  handler: async (ctx, { siteId, reason }) => {
     const site = await ctx.db.get(siteId);
     if (!site) return;
     // Keep showing the previous scorecard if there is one.
     const hasPrevious = (await latestScorecard(ctx, siteId)) !== null;
     await ctx.db.patch(siteId, {
       scorecardStatus: hasPrevious ? "ready" : "failed",
-      scorecardError: error,
+      scorecardError: SCORECARD_ERRORS[reason],
     });
   },
 });

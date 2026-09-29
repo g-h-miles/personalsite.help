@@ -11,11 +11,11 @@ import { buildScorecard } from "./judgment/scorecard";
 import { judgmentProviderLayer } from "./judgment/select";
 import { deploymentEnv } from "./lib/env";
 import { extractSiteMetrics } from "./judgment/siteMetrics";
+import { fetchPageHtml } from "./lib/fetchPage";
 
 class SiteFetchFailed extends Data.TaggedError("SiteFetchFailed")<{ readonly reason: string }> {}
 
 const FETCH_TIMEOUT_MS = 10_000;
-const MAX_HTML_BYTES = 1_000_000;
 
 const fetchHtml = (url: string) =>
   Effect.tryPromise({
@@ -24,14 +24,7 @@ const fetchHtml = (url: string) =>
       const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       signal.addEventListener("abort", () => controller.abort());
       try {
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: { "user-agent": "personalsite.help scorecard (+https://personalsite.help)" },
-          redirect: "follow",
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        return text.slice(0, MAX_HTML_BYTES);
+        return await fetchPageHtml(url, controller.signal);
       } finally {
         clearTimeout(timer);
       }
@@ -40,6 +33,7 @@ const fetchHtml = (url: string) =>
       new SiteFetchFailed({ reason: cause instanceof Error ? cause.message : String(cause) }),
   });
 
+/** For server logs only; users see a generic message (see sites.SCORECARD_ERRORS). */
 function describeError(error: unknown): string {
   if (error && typeof error === "object" && "_tag" in error) {
     const tagged = error as { _tag: string; reason?: string; value?: string };
@@ -78,10 +72,11 @@ export const scoreSite = internalAction({
         focus,
       });
     } else {
-      console.error("scoreSite failed", siteId, result.left);
+      // The raw error stays in the logs; users only see a generic message.
+      console.error("scoreSite failed", siteId, describeError(result.left), result.left);
       await ctx.runMutation(internal.sites.markScorecardFailed, {
         siteId,
-        error: describeError(result.left),
+        reason: result.left._tag === "SiteFetchFailed" ? "unreachable" : "failed",
       });
     }
   },
