@@ -41,7 +41,7 @@ appears (the person and what they want come first; the URL is secondary).
   - `overall` — no particular focus (the default).
 
   At least one is required on submit; `overall` is the default.
-- **`context`** (optional, ≤ 280 chars) — what the owner is going for, e.g.
+- **`context`** (optional, ≤ 140 chars) — what the owner is going for, e.g.
   "I'm applying to brand design roles at small studios".
 - **`audience`** (optional) — who the site is meant to convince.
 

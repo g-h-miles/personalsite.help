@@ -4,7 +4,7 @@ import type { api } from "@convex/_generated/api";
 import { HELP_WANTED, HELP_WANTED_LABELS, type HelpWanted } from "@convex/judgment/taxonomy";
 import { HelpWantedTag } from "@/components/help-wanted";
 import { MonoMeta, PersonName } from "@/components/person";
-import { askQuestion, asksLine, quoted } from "@/lib/ask";
+import { askQuestion, asksLine, quoted, truncate } from "@/lib/ask";
 import { displayUrl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +32,7 @@ export function SiteList({ sites, empty }: { sites: SiteSummary[]; empty: React.
 }
 
 function AskRow({ site }: { site: SiteSummary }) {
-  const question = askQuestion(site.context, site.helpWanted);
+  const question = truncate(askQuestion(site.context, site.helpWanted));
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-4 border-t-2 border-ink py-6 sm:py-8 lg:grid-cols-[260px_minmax(0,1fr)_140px] lg:gap-x-0">
       <div className="flex min-w-0 flex-col gap-1 lg:col-start-1 lg:row-start-1 lg:pt-1.5 lg:pr-6">

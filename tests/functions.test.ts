@@ -3,7 +3,11 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
-import { CLICK_DEDUPE_WINDOW_MS, RECIPROCITY_CRITIQUES_REQUIRED } from "../convex/lib/config";
+import {
+  CLICK_DEDUPE_WINDOW_MS,
+  CONTEXT_MAX,
+  RECIPROCITY_CRITIQUES_REQUIRED,
+} from "../convex/lib/config";
 import { SCORECARD_ERRORS } from "../convex/sites";
 import schema from "../convex/schema";
 
@@ -107,6 +111,28 @@ describe("sites.submit", () => {
     expect(profile?.scorecard?.provider).toBe("mock");
     // Requested focus leads the scorecard.
     expect(profile?.scorecard?.dimensions[0]?.weight).toBeGreaterThan(1);
+  });
+});
+
+describe("sites.submit validation", () => {
+  it(`caps context at ${CONTEXT_MAX} characters`, async () => {
+    const { t, alice } = setup();
+    for (let i = 0; i < RECIPROCITY_CRITIQUES_REQUIRED; i++) {
+      const target = await seedSite(t, `owner_${i}`, `https://owner${i}.dev`);
+      await alice.mutation(api.critiques.submit, { siteId: target, ...goodCritique });
+    }
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const submit = (context: string) =>
+      alice.mutation(api.sites.submit, {
+        url: "https://alice.dev",
+        title: "Alice",
+        helpWanted: ["overall"],
+        context,
+        verificationMethod: "badge",
+      });
+    await expect(submit("x".repeat(CONTEXT_MAX + 1))).rejects.toThrow(/at most 140/);
+    await expect(submit("x".repeat(CONTEXT_MAX))).resolves.toBeDefined();
   });
 });
 

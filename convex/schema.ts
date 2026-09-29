@@ -94,7 +94,7 @@ export default defineSchema({
     ownerId: v.id("users"),
     /** At least one; defaults to ["overall"]. */
     helpWanted: v.array(helpWanted),
-    /** Optional free text, max ~280 chars, e.g. "Applying to brand design roles at small studios". */
+    /** Optional free text, max CONTEXT_MAX (140) chars; older rows may be longer. */
     context: v.optional(v.string()),
     /** Optional: who the site is meant to convince. */
     audience: v.optional(v.string()),

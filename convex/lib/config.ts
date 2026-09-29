@@ -22,7 +22,7 @@ export const CRITIQUE_FIELD_MAX = 2000;
 export const REAUDIT_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Optional free-text context on a site submission ("what I'm going for"). */
-export const CONTEXT_MAX = 280;
+export const CONTEXT_MAX = 140;
 
 /** Optional "who is this site meant to convince" on a site submission. */
 export const AUDIENCE_MAX = 120;
