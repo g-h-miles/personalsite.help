@@ -3,19 +3,24 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource/bricolage-grotesque/800.css";
 @import "@fontsource-variable/inter";
-@import "@fontsource/caveat/600.css";
+@import "@fontsource/caveat/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/700.css";
 
 /*
  * Design tokens — the single place to change colors and fonts.
  *
- * Direction: white paper, black ink, a red accent, sticky-note yellow and
- * tape blue as supporting accents; Bricolage Grotesque (800) for display,
- * Inter for body, Caveat for handwritten annotations. Final designs come from
- * Paper; keep components plain and drive their look from these tokens.
+ * Direction ("studio crit wall", from the Paper file, page "v2 · Crit wall"):
+ * a white wall, black ink, a red pen, sticky-note yellow and painter's-tape
+ * blue. Bricolage Grotesque (800) for display, Inter for body and UI, Caveat
+ * (700) for handwritten notes, JetBrains Mono for labels, URLs and scores.
+ * Square corners, 2px black borders, hard offset shadows; pills only for the
+ * nav CTA, filter chips and the "helpful" counter.
  *
  * Raw palette → shadcn semantic variables → Tailwind utilities (via @theme):
- *   bg-background, text-foreground, text-primary, bg-note, bg-tape,
- *   font-display, font-sans, font-hand, …
+ *   bg-background, text-foreground, text-primary, bg-note, bg-tape, bg-rule,
+ *   font-display, font-sans, font-hand, font-mono, shadow-hard, …
+ * Display type sizes live in the `type-*` utilities below (fluid with clamp()).
  */
 
 :root {
@@ -26,12 +31,13 @@
   --ps-note: #ffe45c;
   --ps-tape: #2b5bff;
   --ps-ink-secondary: #444444;
-  --ps-rule: #e6e6e6;
+  --ps-rule: #eeeeee;
 
   /* Fonts */
   --ps-font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --ps-font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --ps-font-hand: "Caveat", "Comic Sans MS", cursive;
+  --ps-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* shadcn semantic variables */
   --background: var(--ps-paper);
@@ -50,9 +56,9 @@
   --accent-foreground: var(--ps-ink);
   --destructive: var(--ps-red);
   --border: var(--ps-rule);
-  --input: var(--ps-ink-secondary);
+  --input: var(--ps-ink);
   --ring: var(--ps-tape);
-  --radius: 0.25rem;
+  --radius: 0;
 }
 
 @theme inline {
@@ -60,6 +66,18 @@
   --font-heading: var(--ps-font-display);
   --font-sans: var(--ps-font-sans);
   --font-hand: var(--ps-font-hand);
+  --font-mono: var(--ps-font-mono);
+
+  --color-ink: var(--ps-ink);
+  --color-ink-secondary: var(--ps-ink-secondary);
+
+  /* Hard offset shadows: buttons and selected tiles, small pinned card, big pinned card. */
+  --shadow-hard: 5px 5px 0 var(--ps-ink);
+  --shadow-hard-md: 8px 8px 0 var(--ps-ink);
+  --shadow-hard-lg: 10px 10px 0 var(--ps-ink);
+  /* Paper notes lifted off the wall. */
+  --shadow-note: 4px 6px 0 rgb(0 0 0 / 0.15);
+  --shadow-note-lg: 6px 8px 0 rgb(0 0 0 / 0.15);
 
   --color-note: var(--ps-note);
   --color-tape: var(--ps-tape);
@@ -93,20 +111,140 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   html {
     @apply font-sans;
+    overflow-wrap: anywhere;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-synthesis: none;
   }
   h1,
   h2,
   h3 {
-    @apply font-display tracking-tight;
+    @apply font-display;
   }
   a {
     @apply underline decoration-1 underline-offset-2 hover:text-primary;
+    text-underline-position: from-font;
+  }
+  /* One visible focus style everywhere: a tape-blue outline, offset off the ink. */
+  :focus-visible {
+    outline: 3px solid var(--ps-tape);
+    outline-offset: 3px;
+  }
+  ::selection {
+    background: var(--ps-note);
+    color: var(--ps-ink);
+  }
+}
+
+/*
+ * Display type (Bricolage Grotesque 800). Sizes are the Paper values at 1440px
+ * wide and scale down with the viewport; tracking tightens as the size grows.
+ */
+@utility type-hero {
+  /* 128 / 112 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(3.75rem, 8.9vw, 8rem);
+  line-height: 0.875;
+  letter-spacing: -0.045em;
+}
+@utility type-h1 {
+  /* 96 / 88 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(3rem, 6.67vw, 6rem);
+  line-height: 0.917;
+  letter-spacing: -0.045em;
+}
+@utility type-question {
+  /* 80 / 78 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(2.5rem, 5.56vw, 5rem);
+  line-height: 0.975;
+  letter-spacing: -0.045em;
+}
+@utility type-h2 {
+  /* 56 / 56 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(2.25rem, 3.9vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+@utility type-ask {
+  /* 40 / 44 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(1.75rem, 2.78vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+@utility type-h3 {
+  /* 32 / 36 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(1.625rem, 2.23vw, 2rem);
+  line-height: 1.125;
+  letter-spacing: -0.03em;
+}
+@utility type-note {
+  /* 28 / 32 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: clamp(1.375rem, 1.95vw, 1.75rem);
+  line-height: 1.143;
+  letter-spacing: -0.03em;
+}
+@utility type-tile {
+  /* 24 / 28 */
+  font-family: var(--ps-font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 1.167;
+  letter-spacing: -0.02em;
+}
+
+/* Mono labels: "01 · YOUR SITE", "ONE THING TO FIX", … */
+@utility label-mono {
+  font-family: var(--ps-font-mono);
+  font-size: 13px;
+  line-height: 18px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Handwritten annotations (the red pen, the sticky notes). */
+@utility type-hand {
+  font-family: var(--ps-font-hand);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 30px;
+}
+
+/* Hard-shadow press: lifts on hover, presses into the wall when clicked. */
+@utility press {
+  transition:
+    translate 120ms ease-out,
+    box-shadow 120ms ease-out;
+  &:hover:not(:disabled) {
+    translate: -1px -1px;
+    box-shadow: 6px 6px 0 var(--ps-ink);
+  }
+  &:active:not(:disabled) {
+    translate: 3px 3px;
+    box-shadow: 2px 2px 0 var(--ps-ink);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover:not(:disabled),
+    &:active:not(:disabled) {
+      translate: none;
+    }
   }
 }
