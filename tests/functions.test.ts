@@ -93,6 +93,9 @@ describe("sites.submit", () => {
         const target = await seedSite(t, `owner_${i}`, `https://owner${i}.dev`);
         await alice.mutation(api.critiques.submit, { siteId: target, ...goodCritique });
       }
+      // Pending critiques don't count until moderation publishes them.
+      await expect(submit()).rejects.toThrow(/you've given 0/);
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
     }
 
     const siteId = await submit();
@@ -104,6 +107,26 @@ describe("sites.submit", () => {
     expect(profile?.scorecard?.provider).toBe("mock");
     // Requested focus leads the scorecard.
     expect(profile?.scorecard?.dimensions[0]?.weight).toBeGreaterThan(1);
+  });
+});
+
+describe("reciprocity", () => {
+  it("counts only published critiques", async () => {
+    const { t, alice } = setup();
+    const given = async () => (await alice.query(api.sites.submitEligibility, {})).given;
+    const target = await seedSite(t, "owner", "https://owner.dev");
+    const critiqueId: Id<"critiques"> = await alice.mutation(api.critiques.submit, {
+      siteId: target,
+      ...goodCritique,
+    });
+
+    expect(await given()).toBe(0); // pending
+    for (const status of ["flagged", "held"] as const) {
+      await t.run((ctx) => ctx.db.patch(critiqueId, { moderationStatus: status }));
+      expect(await given()).toBe(0);
+    }
+    await t.run((ctx) => ctx.db.patch(critiqueId, { moderationStatus: "published" }));
+    expect(await given()).toBe(1);
   });
 });
 

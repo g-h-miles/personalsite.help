@@ -60,13 +60,17 @@ async function siteSummary(ctx: QueryCtx, site: Doc<"sites">) {
   };
 }
 
-/** Critiques this user has given on other people's sites that count toward reciprocity. */
+/**
+ * Critiques this user has given on other people's sites that count toward
+ * reciprocity. Only published ones: pending critiques haven't passed
+ * moderation yet, and flagged or held ones didn't pass cleanly.
+ */
 async function countGivenCritiques(ctx: QueryCtx, user: Doc<"users">): Promise<number> {
   const given = await ctx.db
     .query("critiques")
     .withIndex("by_author", (q) => q.eq("authorId", user._id))
     .take(200);
-  return given.filter((c) => c.moderationStatus !== "held" && c.siteId !== user.siteId).length;
+  return given.filter((c) => c.moderationStatus === "published" && c.siteId !== user.siteId).length;
 }
 
 /** User-facing scorecard failure messages. The raw error only goes to the server logs. */

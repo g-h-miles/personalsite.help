@@ -3,7 +3,7 @@
  */
 
 /**
- * Reciprocity gate: how many visible critiques a user must have given on other
+ * Reciprocity gate: how many published critiques a user must have given on other
  * people's sites before they can post their own. Set to 0 to disable.
  */
 export const RECIPROCITY_CRITIQUES_REQUIRED = 2;
