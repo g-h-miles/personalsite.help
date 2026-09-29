@@ -259,6 +259,55 @@ describe("sites.recordClick", () => {
   });
 });
 
+describe("sites.pruneClicks", () => {
+  it("deletes expired dedupe rows in bounded batches until none remain", async () => {
+    const { t } = setup();
+    const siteId = await seedSite(t, "lee", "https://lee.dev");
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 1203; i++) {
+        await ctx.db.insert("siteClicks", {
+          siteId,
+          visitor: `anon:stale-${i}`,
+          countedAt: now - CLICK_DEDUPE_WINDOW_MS - 1000 - i,
+        });
+      }
+      for (let i = 0; i < 3; i++) {
+        await ctx.db.insert("siteClicks", {
+          siteId,
+          visitor: `anon:fresh-${i}`,
+          countedAt: now - i * 1000,
+        });
+      }
+    });
+    const remaining = () =>
+      t.run(async (ctx) => (await ctx.db.query("siteClicks").collect()).length);
+
+    await t.mutation(internal.sites.pruneClicks, {});
+    expect(await remaining()).toBe(1206 - 500); // one bounded batch per run
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const left = await t.run((ctx) => ctx.db.query("siteClicks").collect());
+    expect(left.map((r) => r.visitor).toSorted()).toEqual([
+      "anon:fresh-0",
+      "anon:fresh-1",
+      "anon:fresh-2",
+    ]);
+  });
+
+  it("lets a visitor's click count again after their row is pruned", async () => {
+    const { t } = setup();
+    const siteId = await seedSite(t, "max", "https://max.dev");
+    const visitorId = "prune-test-visitor";
+    await t.mutation(api.sites.recordClick, { siteId, visitorId });
+    vi.advanceTimersByTime(CLICK_DEDUPE_WINDOW_MS);
+    await t.mutation(internal.sites.pruneClicks, {});
+    expect(await t.run((ctx) => ctx.db.query("siteClicks").collect())).toHaveLength(0);
+    await t.mutation(api.sites.recordClick, { siteId, visitorId });
+    expect(await clicks(t, siteId)).toBe(2);
+  });
+});
+
 describe("critiques", () => {
   it("accepts anonymous critiques and publishes them after moderation", async () => {
     const { t } = setup();

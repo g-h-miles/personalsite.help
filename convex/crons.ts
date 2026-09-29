@@ -12,4 +12,11 @@ crons.daily(
   {},
 );
 
+crons.daily(
+  "prune expired click dedupe rows",
+  { hourUTC: 7, minuteUTC: 0 },
+  internal.sites.pruneClicks,
+  {},
+);
+
 export default crons;

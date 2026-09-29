@@ -396,6 +396,28 @@ export const inductToHallOfFame = internalMutation({
   },
 });
 
+/** Rows deleted per pruneClicks run; it reschedules itself while more remain. */
+const CLICK_PRUNE_BATCH = 500;
+
+/**
+ * Daily cron: delete siteClicks rows older than the dedupe window. They no
+ * longer block a click, so they're only dead weight.
+ */
+export const pruneClicks = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - CLICK_DEDUPE_WINDOW_MS;
+    const stale = await ctx.db
+      .query("siteClicks")
+      .withIndex("by_counted_at", (q) => q.lte("countedAt", cutoff))
+      .take(CLICK_PRUNE_BATCH);
+    for (const row of stale) await ctx.db.delete(row._id);
+    if (stale.length === CLICK_PRUNE_BATCH) {
+      await ctx.scheduler.runAfter(0, internal.sites.pruneClicks, {});
+    }
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Internal: used by the scorecard action (convex/judge.ts)
 // ---------------------------------------------------------------------------

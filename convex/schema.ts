@@ -126,7 +126,9 @@ export default defineSchema({
     /** "user:<users id>" when signed in, else "anon:<client-generated id>". */
     visitor: v.string(),
     countedAt: v.number(),
-  }).index("by_site_visitor", ["siteId", "visitor"]),
+  })
+    .index("by_site_visitor", ["siteId", "visitor"])
+    .index("by_counted_at", ["countedAt"]),
 
   scorecards: defineTable({
     siteId: v.id("sites"),
