@@ -8,4 +8,10 @@
     "directory": "./dist",
     "not_found_handling": "single-page-application",
   },
+  "workers_dev": true,
+  // personalsitehelp.com redirects here via a Cloudflare redirect rule on its zone.
+  "routes": [
+    { "pattern": "personalsite.help", "custom_domain": true },
+    { "pattern": "www.personalsite.help", "custom_domain": true },
+  ],
 }
