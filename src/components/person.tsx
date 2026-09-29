@@ -54,8 +54,3 @@ export function MonoMeta({
     </span>
   );
 }
-
-/** @deprecated Kept until the profile and notes move to PersonName. */
-export function Person({ person }: { person: PersonInfo | null }) {
-  return <PersonName person={person} />;
-}

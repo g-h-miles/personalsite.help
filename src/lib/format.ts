@@ -28,6 +28,14 @@ export function timeAgo(ms: number, now = Date.now()): string {
   return new Date(ms).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Whole days since `ms`: "1 day", "3 days". */
+export function daysSince(ms: number, now = Date.now()): string {
+  const n = Math.max(0, Math.floor((now - ms) / DAY));
+  return `${n} ${n === 1 ? "day" : "days"}`;
+}
+
 /** User-facing message from a Convex mutation error. */
 export function errorMessage(error: unknown): string {
   if (error instanceof ConvexError && typeof error.data === "string") return error.data;
