@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/bricolage-grotesque/800.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource/caveat/600.css";
+
+/*
+ * Design tokens — the single place to change colors and fonts.
+ *
+ * Direction: white paper, black ink, a red accent, sticky-note yellow and
+ * tape blue as supporting accents; Bricolage Grotesque (800) for display,
+ * Inter for body, Caveat for handwritten annotations. Final designs come from
+ * Paper; keep components plain and drive their look from these tokens.
+ *
+ * Raw palette → shadcn semantic variables → Tailwind utilities (via @theme):
+ *   bg-background, text-foreground, text-primary, bg-note, bg-tape,
+ *   font-display, font-sans, font-hand, …
+ */
+
+:root {
+  /* Raw palette */
+  --ps-paper: #ffffff;
+  --ps-ink: #000000;
+  --ps-red: #e8112d;
+  --ps-note: #ffe45c;
+  --ps-tape: #2b5bff;
+  --ps-ink-secondary: #444444;
+  --ps-rule: #e6e6e6;
+
+  /* Fonts */
+  --ps-font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --ps-font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --ps-font-hand: "Caveat", "Comic Sans MS", cursive;
+
+  /* shadcn semantic variables */
+  --background: var(--ps-paper);
+  --foreground: var(--ps-ink);
+  --card: var(--ps-paper);
+  --card-foreground: var(--ps-ink);
+  --popover: var(--ps-paper);
+  --popover-foreground: var(--ps-ink);
+  --primary: var(--ps-red);
+  --primary-foreground: var(--ps-paper);
+  --secondary: var(--ps-note);
+  --secondary-foreground: var(--ps-ink);
+  --muted: var(--ps-rule);
+  --muted-foreground: var(--ps-ink-secondary);
+  --accent: var(--ps-note);
+  --accent-foreground: var(--ps-ink);
+  --destructive: var(--ps-red);
+  --border: var(--ps-rule);
+  --input: var(--ps-ink-secondary);
+  --ring: var(--ps-tape);
+  --radius: 0.25rem;
+}
+
+@theme inline {
+  --font-display: var(--ps-font-display);
+  --font-heading: var(--ps-font-display);
+  --font-sans: var(--ps-font-sans);
+  --font-hand: var(--ps-font-hand);
+
+  --color-note: var(--ps-note);
+  --color-tape: var(--ps-tape);
+  --color-red: var(--ps-red);
+  --color-rule: var(--ps-rule);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+  a {
+    @apply underline decoration-1 underline-offset-2 hover:text-primary;
+  }
+}
