@@ -173,3 +173,75 @@ describe("buildScorecard with the mock provider", () => {
     ]);
   });
 });
+
+describe("extractSiteMetrics on hostile HTML", () => {
+  it("ignores script and style contents, and drops everything after an unclosed <script>", () => {
+    const m = extractSiteMetrics(
+      `<title>Jane</title><p>Hello there</p><style>p { color: #f00 }</style>` +
+        `<script>var s = "<p>not visible</p>"</script><p>friend</p><script>never closed <p>lost words`,
+    );
+    expect(m.title).toBe("Jane");
+    expect(m.wordCount).toBe(4); // "Jane Hello there friend"
+    expect(m.colorCount).toBe(1);
+  });
+
+  it("doesn't treat custom elements like <script-foo> as script or style", () => {
+    const m = extractSiteMetrics(
+      `<script-foo>visible words</script-foo><style-x>color: #123</style-x><p>after</p>`,
+    );
+    expect(m.wordCount).toBe(5); // "visible words color: #123 after"
+    expect(m.colorCount).toBe(0);
+    // Real script and style elements still end at whitespace, "/" or ">".
+    const real = extractSiteMetrics(
+      `<script type="module">hidden()</script><style\n>p { color: #abc }</style><p>shown</p>`,
+    );
+    expect(real.wordCount).toBe(1);
+    expect(real.colorCount).toBe(1);
+  });
+
+  it("keeps text after a literal < that doesn't start a tag", () => {
+    const m = extractSiteMetrics(
+      "<p>Hi, I'm Jane. If 1 < 2 then I have years of experience with clients",
+    );
+    expect(m.backgroundMentions).toBe(3); // years, experience, clients
+  });
+
+  it("stays linear on 1 MB of text full of literal <", () => {
+    const html = "a < b ".repeat(Math.floor(1_000_000 / 6));
+    const start = performance.now();
+    const m = extractSiteMetrics(html);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(m.wordCount).toBe(3 * Math.floor(1_000_000 / 6)); // nothing dropped
+  }, 10_000);
+
+  it("still reads tags and links", () => {
+    const m = extractSiteMetrics(GOOD_SITE);
+    expect(m).toMatchObject({
+      title: "Jane Doe — brand designer",
+      hasMetaDescription: true,
+      hasViewportMeta: true,
+      hasLang: true,
+      imageCount: 1,
+      imagesWithAlt: 1,
+      linkCount: 1,
+      hasContactLink: true,
+    });
+    expect(extractSiteMetrics(BARE_SITE)).toMatchObject({
+      hasLang: false,
+      imagesWithAlt: 0,
+      hasContactLink: false,
+    });
+  });
+
+  it.each(["<script>", "<style>x", "<title>", "<a ", "<meta ", "<img ", 'href="', ' style="'])(
+    "stays linear on 1 MB of unclosed %j",
+    (unit) => {
+      const html = unit.repeat(Math.floor(1_000_000 / unit.length));
+      const start = performance.now();
+      extractSiteMetrics(html);
+      // Linear passes take tens of ms; the old regexes took minutes on some of these.
+      expect(performance.now() - start).toBeLessThan(2000);
+    },
+    10_000,
+  );
+});

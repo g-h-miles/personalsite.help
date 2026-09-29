@@ -3,7 +3,7 @@
  */
 
 /**
- * Reciprocity gate: how many visible critiques a user must have given on other
+ * Reciprocity gate: how many published critiques a user must have given on other
  * people's sites before they can post their own. Set to 0 to disable.
  */
 export const RECIPROCITY_CRITIQUES_REQUIRED = 2;
@@ -22,7 +22,10 @@ export const CRITIQUE_FIELD_MAX = 2000;
 export const REAUDIT_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Optional free-text context on a site submission ("what I'm going for"). */
-export const CONTEXT_MAX = 280;
+export const CONTEXT_MAX = 140;
 
 /** Optional "who is this site meant to convince" on a site submission. */
 export const AUDIENCE_MAX = 120;
+
+/** An outbound click counts at most once per visitor per site in this window. */
+export const CLICK_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;

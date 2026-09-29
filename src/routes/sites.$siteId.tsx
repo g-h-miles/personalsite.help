@@ -10,8 +10,9 @@ import { MonoMeta, PersonName } from "@/components/person";
 import { BrowserFrame, PlaceholderBars, Tape } from "@/components/pinned-site";
 import { Scorecard } from "@/components/scorecard";
 import { Button } from "@/components/ui/button";
-import { askQuestion, asksLine, firstName, quoted } from "@/lib/ask";
+import { askQuestion, asksLine, firstName, quoted, truncate } from "@/lib/ask";
 import { daysSince, displayUrl, errorMessage } from "@/lib/format";
+import { visitorId } from "@/lib/visitor";
 
 const siteQuery = (siteId: Id<"sites">) => convexQuery(api.sites.get, { siteId });
 
@@ -65,7 +66,7 @@ function SiteProfilePage() {
             )}
           </p>
           <h1 className="type-question text-balance">
-            {quoted(askQuestion(site.context, site.helpWanted))}
+            {quoted(truncate(askQuestion(site.context, site.helpWanted)))}
           </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
             <HelpWantedTags helpWanted={site.helpWanted} />
@@ -107,8 +108,8 @@ function SiteProfilePage() {
             <a
               href={site.url}
               target="_blank"
-              rel="noopener"
-              onClick={() => void recordClick({ siteId: site._id })}
+              rel="noopener noreferrer"
+              onClick={() => void recordClick({ siteId: site._id, visitorId: visitorId() })}
               className="text-base leading-6 font-bold text-foreground"
             >
               Visit the site ↗<span className="sr-only"> ({domain}, opens in a new tab)</span>

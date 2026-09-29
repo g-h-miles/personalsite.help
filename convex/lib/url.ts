@@ -12,6 +12,8 @@ export function normalizeSiteUrl(input: string): { url: string; normalized: stri
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
   const host = parsed.hostname.toLowerCase();
   if (!host.includes(".") || host === "localhost" || /^[\d.]+$/.test(host)) return null;
+  // Trailing dots ("localhost.") and names reserved for local/internal networks.
+  if (host.endsWith(".") || /\.(localhost|internal|local)$/.test(host)) return null;
   if (parsed.username || parsed.password) return null;
 
   const path = parsed.pathname.replace(/\/+$/, "");

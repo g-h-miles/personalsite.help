@@ -9,7 +9,12 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { getViewer, requireViewer } from "./lib/auth";
-import { AUDIENCE_MAX, CONTEXT_MAX, RECIPROCITY_CRITIQUES_REQUIRED } from "./lib/config";
+import {
+  AUDIENCE_MAX,
+  CLICK_DEDUPE_WINDOW_MS,
+  CONTEXT_MAX,
+  RECIPROCITY_CRITIQUES_REQUIRED,
+} from "./lib/config";
 import { bumpClickHeat } from "./lib/trending";
 import { normalizeSiteUrl } from "./lib/url";
 import { helpWanted, judgmentProviderName, scorecardDimension } from "./schema";
@@ -60,14 +65,33 @@ async function siteSummary(ctx: QueryCtx, site: Doc<"sites">) {
   };
 }
 
-/** Critiques this user has given on other people's sites that count toward reciprocity. */
+/**
+ * Critiques this user has given on other people's sites that count toward
+ * reciprocity. Only published ones: pending critiques haven't passed
+ * moderation yet, and flagged or held ones didn't pass cleanly.
+ */
 async function countGivenCritiques(ctx: QueryCtx, user: Doc<"users">): Promise<number> {
   const given = await ctx.db
     .query("critiques")
     .withIndex("by_author", (q) => q.eq("authorId", user._id))
     .take(200);
-  return given.filter((c) => c.moderationStatus !== "held" && c.siteId !== user.siteId).length;
+  return given.filter((c) => c.moderationStatus === "published" && c.siteId !== user.siteId).length;
 }
+
+/** User-facing scorecard failure messages. The raw error only goes to the server logs. */
+export const SCORECARD_ERRORS = {
+  unreachable: "We couldn't reach this site to score it.",
+  failed: "Something went wrong while scoring this site.",
+} as const;
+
+/** Never expose a stored error verbatim (older rows hold raw fetch/exception text). */
+function publicScorecardError(stored: string | undefined): string | undefined {
+  if (!stored) return undefined;
+  return Object.values(SCORECARD_ERRORS).find((m) => m === stored) ?? SCORECARD_ERRORS.failed;
+}
+
+/** Anonymous visitor ids are client-generated; accept only short opaque tokens. */
+const VISITOR_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -191,7 +215,7 @@ export const get = query({
         clickCount: site.clickCount,
         critiqueCount: site.critiqueCount,
         scorecardStatus: site.scorecardStatus,
-        scorecardError: site.scorecardError,
+        scorecardError: publicScorecardError(site.scorecardError),
       },
       owner: publicAuthor(owner),
       scorecard,
@@ -319,15 +343,34 @@ export const graduate = mutation({
 });
 
 /**
- * Record an outbound click. Anonymous by design.
- * TODO: de-duplicate per visitor / rate limit to resist click inflation.
+ * Record an outbound click. Counted at most once per visitor per site every
+ * `CLICK_DEDUPE_WINDOW_MS`, so one person can't inflate trending. The visitor
+ * is the signed-in user, else the anonymous id the client keeps in
+ * localStorage; clicks with neither aren't counted.
  */
 export const recordClick = mutation({
-  args: { siteId: v.id("sites") },
-  handler: async (ctx, { siteId }) => {
+  args: { siteId: v.id("sites"), visitorId: v.optional(v.string()) },
+  handler: async (ctx, { siteId, visitorId }) => {
     const site = await ctx.db.get(siteId);
     if (!site) return;
+
+    const viewer = await getViewer(ctx);
+    const visitor = viewer
+      ? `user:${viewer._id}`
+      : visitorId && VISITOR_ID.test(visitorId)
+        ? `anon:${visitorId}`
+        : null;
+    if (!visitor) return;
+
     const now = Date.now();
+    const last = await ctx.db
+      .query("siteClicks")
+      .withIndex("by_site_visitor", (q) => q.eq("siteId", siteId).eq("visitor", visitor))
+      .unique();
+    if (last && now - last.countedAt < CLICK_DEDUPE_WINDOW_MS) return;
+    if (last) await ctx.db.patch(last._id, { countedAt: now });
+    else await ctx.db.insert("siteClicks", { siteId, visitor, countedAt: now });
+
     await ctx.db.patch(siteId, {
       clickCount: site.clickCount + 1,
       clickHeat: bumpClickHeat(site.clickHeat, site.clickHeatAt, now),
@@ -350,6 +393,28 @@ export const inductToHallOfFame = internalMutation({
     if (!site) throw new ConvexError("Site not found.");
     if (site.status !== "graduated") throw new ConvexError("Only graduated sites can be inducted.");
     await ctx.db.patch(siteId, { status: "hall-of-fame", verificationMethod, verified: true });
+  },
+});
+
+/** Rows deleted per pruneClicks run; it reschedules itself while more remain. */
+const CLICK_PRUNE_BATCH = 500;
+
+/**
+ * Daily cron: delete siteClicks rows older than the dedupe window. They no
+ * longer block a click, so they're only dead weight.
+ */
+export const pruneClicks = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - CLICK_DEDUPE_WINDOW_MS;
+    const stale = await ctx.db
+      .query("siteClicks")
+      .withIndex("by_counted_at", (q) => q.lte("countedAt", cutoff))
+      .take(CLICK_PRUNE_BATCH);
+    for (const row of stale) await ctx.db.delete(row._id);
+    if (stale.length === CLICK_PRUNE_BATCH) {
+      await ctx.scheduler.runAfter(0, internal.sites.pruneClicks, {});
+    }
   },
 });
 
@@ -398,15 +463,15 @@ export const saveScorecard = internalMutation({
 });
 
 export const markScorecardFailed = internalMutation({
-  args: { siteId: v.id("sites"), error: v.string() },
-  handler: async (ctx, { siteId, error }) => {
+  args: { siteId: v.id("sites"), reason: v.union(v.literal("unreachable"), v.literal("failed")) },
+  handler: async (ctx, { siteId, reason }) => {
     const site = await ctx.db.get(siteId);
     if (!site) return;
     // Keep showing the previous scorecard if there is one.
     const hasPrevious = (await latestScorecard(ctx, siteId)) !== null;
     await ctx.db.patch(siteId, {
       scorecardStatus: hasPrevious ? "ready" : "failed",
-      scorecardError: error,
+      scorecardError: SCORECARD_ERRORS[reason],
     });
   },
 });

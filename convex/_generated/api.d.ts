@@ -23,6 +23,7 @@ import type * as judgment_taxonomy from "../judgment/taxonomy.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_config from "../lib/config.js";
 import type * as lib_env from "../lib/env.js";
+import type * as lib_fetchPage from "../lib/fetchPage.js";
 import type * as lib_trending from "../lib/trending.js";
 import type * as lib_url from "../lib/url.js";
 import type * as seed from "../seed.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/config": typeof lib_config;
   "lib/env": typeof lib_env;
+  "lib/fetchPage": typeof lib_fetchPage;
   "lib/trending": typeof lib_trending;
   "lib/url": typeof lib_url;
   seed: typeof seed;

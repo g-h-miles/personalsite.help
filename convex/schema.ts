@@ -94,7 +94,7 @@ export default defineSchema({
     ownerId: v.id("users"),
     /** At least one; defaults to ["overall"]. */
     helpWanted: v.array(helpWanted),
-    /** Optional free text, max ~280 chars, e.g. "Applying to brand design roles at small studios". */
+    /** Optional free text, max CONTEXT_MAX (140) chars; older rows may be longer. */
     context: v.optional(v.string()),
     /** Optional: who the site is meant to convince. */
     audience: v.optional(v.string()),
@@ -119,6 +119,16 @@ export default defineSchema({
     .index("by_status_graduated", ["status", "graduatedAt"])
     .index("by_owner", ["ownerId"])
     .index("by_normalized_url", ["normalizedUrl"]),
+
+  /** Last counted outbound click per (site, visitor); see sites.recordClick. */
+  siteClicks: defineTable({
+    siteId: v.id("sites"),
+    /** "user:<users id>" when signed in, else "anon:<client-generated id>". */
+    visitor: v.string(),
+    countedAt: v.number(),
+  })
+    .index("by_site_visitor", ["siteId", "visitor"])
+    .index("by_counted_at", ["countedAt"]),
 
   scorecards: defineTable({
     siteId: v.id("sites"),

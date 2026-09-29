@@ -1,4 +1,5 @@
 import type { HelpWanted, Role } from "@convex/judgment/taxonomy";
+import { CONTEXT_MAX } from "@convex/lib/config";
 
 /**
  * The person's question, as it appears on the wall. Owners can write their own
@@ -24,8 +25,8 @@ export const HELP_WANTED_DESCRIPTIONS: Record<HelpWanted, string> = {
   overall: "Everything. Be honest with me.",
 };
 
-/** Max length of the owner's own question on the submit form. */
-export const QUESTION_MAX = 140;
+/** Max length of the owner's own question on the submit form (stored as `context`). */
+export const QUESTION_MAX = CONTEXT_MAX;
 
 /** Strip wrapping quotes so we can add our own curly ones. */
 function unquote(text: string): string {
@@ -37,6 +38,17 @@ export function askQuestion(context: string | undefined, helpWanted: readonly He
   const own = context ? unquote(context) : "";
   if (own) return own;
   return DEFAULT_QUESTIONS[helpWanted[0] ?? "overall"];
+}
+
+/**
+ * Cut `text` to at most `max` characters, ending on a word with an ellipsis.
+ * For older questions saved before the limit was lowered.
+ */
+export function truncate(text: string, max = QUESTION_MAX): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
 /** “The question”, in curly quotes. */
