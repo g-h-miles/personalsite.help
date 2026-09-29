@@ -2,9 +2,11 @@
  * Fetch a submitted site's HTML for the scorecard without trusting the site.
  *
  * Redirects are followed by hand so every hop is re-validated with
- * `normalizeSiteUrl` (a public page can't bounce us to localhost or a bare IP),
- * and the body is read as a stream and cut off at `MAX_HTML_BYTES`, so a huge
- * or endless response can't exhaust the action's memory.
+ * `normalizeSiteUrl`: a redirect can't send us to a URL the submit form would
+ * reject (localhost, a bare IP, *.internal, …). That check looks at the URL
+ * only, so a public DNS name that resolves to a private IP is not caught.
+ * The body is read as a stream and cut off at `MAX_HTML_BYTES`, so a huge or
+ * endless response can't exhaust the action's memory.
  */
 import { normalizeSiteUrl } from "./url";
 
